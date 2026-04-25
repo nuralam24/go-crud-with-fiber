@@ -1,0 +1,30 @@
+# Environment and secrets
+.env
+
+# Go workspace/cache created locally for this project
+.gomodcache/
+.gopath/
+
+# Build artifacts
+/bin/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.out
+
+# Watcher / dev tools
+.air-tmp/
+.tools/
+
+# IDE / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Logs
+*.log

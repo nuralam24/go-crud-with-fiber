@@ -1,0 +1,26 @@
+root = "."
+tmp_dir = ".air-tmp"
+
+[build]
+cmd = "GOMODCACHE=$PWD/.gomodcache GOPATH=$PWD/.gopath go build -o ./.air-tmp/api ./cmd/api"
+bin = ".air-tmp/api"
+full_bin = "APP_ENV=dev ./.air-tmp/api"
+include_ext = ["go", "yaml", "yml", "env"]
+exclude_dir = [".git", ".gopath", ".gomodcache", ".air-tmp", "tmp", "vendor"]
+exclude_file = []
+delay = 500
+stop_on_error = true
+send_interrupt = true
+kill_delay = 500
+
+[log]
+time = true
+
+[color]
+main = "cyan"
+watcher = "yellow"
+build = "green"
+runner = "magenta"
+
+[screen]
+clear_on_rebuild = true
