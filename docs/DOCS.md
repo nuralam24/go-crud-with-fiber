@@ -2,6 +2,11 @@
 
 এই ডকুমেন্টটি এমনভাবে লেখা হয়েছে যেন Go সম্পর্কে আগে থেকে ধারণা না থাকলেও পুরো প্রজেক্টটা বোঝা যায়।
 
+**Related docs**
+- আর্কিটেকচার (লেয়ার, ডায়াগ্রাম, স্কেলিং নোট): [`ARCHITECTURE.md`](./ARCHITECTURE.md)
+- HTTP request → response (ফাইল বাই ফাইল): [`REQUEST_LIFECYCLE.md`](./REQUEST_LIFECYCLE.md)
+- শেখার টপিক (এই প্রজেক্ট থেকে নিজের প্রজেক্ট): [`LEARNING_TOPICS.md`](./LEARNING_TOPICS.md)
+
 ---
 
 ## 1) Project ta ki?
