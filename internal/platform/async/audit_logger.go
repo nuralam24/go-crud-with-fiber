@@ -1,7 +1,6 @@
 package async
 
 import (
-	"context"
 	"log/slog"
 	"sync"
 )
@@ -17,6 +16,8 @@ type AuditLogger struct {
 	workers int
 	logger  *slog.Logger
 	wg      sync.WaitGroup
+	mu      sync.Mutex
+	stopped bool
 }
 
 func NewAuditLogger(bufferSize int, workers int, logger *slog.Logger) *AuditLogger {
@@ -27,32 +28,38 @@ func NewAuditLogger(bufferSize int, workers int, logger *slog.Logger) *AuditLogg
 	}
 }
 
-func (a *AuditLogger) Start(ctx context.Context) {
-	for i := 0; i < a.workers; i++ {
-		a.wg.Add(1)
+// Start launches worker goroutines. Shutdown is driven solely by Stop (closes the channel);
+// workers drain until the channel is closed, so buffered events are not abandoned on shutdown.
+func (a *AuditLogger) Start() {
+	a.wg.Add(a.workers)
+	for range a.workers {
 		go func() {
 			defer a.wg.Done()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case event, ok := <-a.ch:
-					if !ok {
-						return
-					}
-					a.logger.Info("audit-event", "action", event.Action, "actor", event.Actor, "target", event.Target)
-				}
+			for event := range a.ch {
+				a.logger.Info("audit-event", "action", event.Action, "actor", event.Actor, "target", event.Target)
 			}
 		}()
 	}
 }
 
 func (a *AuditLogger) Stop() {
+	a.mu.Lock()
+	if a.stopped {
+		a.mu.Unlock()
+		return
+	}
+	a.stopped = true
 	close(a.ch)
+	a.mu.Unlock()
 	a.wg.Wait()
 }
 
 func (a *AuditLogger) Publish(event AuditEvent) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.stopped {
+		return
+	}
 	select {
 	case a.ch <- event:
 	default:

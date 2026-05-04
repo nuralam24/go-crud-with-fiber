@@ -117,7 +117,7 @@ sequenceDiagram
 
   M->>C: Load()
   M->>DB: NewPostgresPool(ctx)
-  M->>A: New + Start(ctx)
+  M->>A: New + Start()
   M->>APP: NewServer(...)
   M->>APP: Run(...) -> Listen
   Note over L: HTTP requests accepted
@@ -237,7 +237,7 @@ flowchart LR
 
 ## 9) কনকারেন্সি ও ব্যাকগ্রাউন্ড
 
-- **Audit logger**: বাফার্ড চ্যানেল + একাধিক goroutine worker; `Publish` ননব্লকিং (চাপে ড্রপ)।  
+- **Audit logger**: বাফার্ড চ্যানেল + একাধিক goroutine worker; `Publish` ননব্লকিং `select` (চাপে ড্রপ)। লাইফসাইকেল: `Start()` ওয়ার্কার চালু করে; `Stop()` (সাধারণত `main` এ `defer`) চ্যানেল `close` করে, `sync.WaitGroup` এ ড্রেন শেষ পর্যন্ত অপেক্ষা; `Publish`/`Stop` রেস এড়াতে মিউটেক্স।  
 ফাইল: `internal/platform/async/audit_logger.go`।
 
 ---
@@ -253,7 +253,8 @@ flowchart LR
 
 | Tool | Purpose |
 |------|---------|
-| `Makefile` | `run`, `watch`, `build`, `test`, `migrate`, `sqlc` |
+| `Makefile` | `run`, `watch`, `build`, `test`, `fmt`, `lint`, `migrate`, `sqlc` |
+| `.golangci.yml` | `golangci-lint` কনফিগ (টিম-ওয়াইড স্টাইল/বাগ চেক) |
 | Air (`.air.toml`) | ফাইল চেঞ্জে auto rebuild/restart |
 
 ---

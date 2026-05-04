@@ -28,7 +28,7 @@ func main() {
 	defer pool.Close()
 
 	auditLogger := async.NewAuditLogger(cfg.AuditBufferSize, cfg.AuditWorkerGoroutines, logger)
-	auditLogger.Start(ctx)
+	auditLogger.Start()
 	defer auditLogger.Stop()
 
 	server := app.NewServer(cfg, logger, pool, auditLogger)

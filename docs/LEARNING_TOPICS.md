@@ -91,7 +91,7 @@
 - `app.Run` → `ShutdownWithContext(shutdownCtx)`।
 - `handler`: `c.Context()` পাস করে service/repo তে।
 - `internal/platform/db/postgres.go` — ping এ `context.WithTimeout`।
-- `audit_logger.go` — worker গুলো `ctx.Done()` দেখে বন্ধ।
+- `audit_logger.go` — ওয়ার্কার শাটডাউন চ্যানেল `close` + `for range` ড্রেন; প্রসেস সিগনালের `ctx` এখানে সরাসরি লাগে না (`Stop()` `main` এর `defer` থেকে)।
 
 **প্র্যাকটিস**
 - নতুন DB কলে সবসময় `ctx` পাস করো; `context.Background()` শুধু যেখানে উপযুক্ত।
@@ -258,9 +258,9 @@
 
 **কী শিখবে**
 - Background worker pool pattern।
-- `select` + `ctx.Done()` — শাটডাউন।
-- `close(ch)` + `wg.Wait()` — ড্রেন।
-- ননব্লকিং সেন্ড (`default`) — ব্যাকপ্রেশারে ড্রপ।
+- `close(ch)` + `for range` + `wg.Wait()` — প্রোডিউসার স্টপ ও ড্রেন (audit লগার)।
+- অন্য জায়গায় (যেমন HTTP সার্ভার) `select` + `ctx.Done()` — গ্রেসফুল শাটডাউন।
+- ননব্লকিং সেন্ড (`select` + `default`) — ব্যাকপ্রেশারে ড্রপ (`Publish`)।
 
 **এই প্রজেক্টে**
 - `internal/platform/async/audit_logger.go` — পুরোটাই পড়ার মতো উদাহরণ।

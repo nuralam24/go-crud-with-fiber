@@ -38,8 +38,8 @@ Response JSON (handler) অথবা Error → Fiber ErrorHandler
 | 2 | `internal/config/config.go` | env থেকে `Config` struct |
 | 3 | `cmd/api/main.go` | `db.NewPostgresPool(...)` |
 | 4 | `internal/platform/db/postgres.go` | `pgxpool` তৈরি + ping/retry |
-| 5 | `cmd/api/main.go` | `async.NewAuditLogger` + `Start` |
-| 6 | `internal/platform/async/audit_logger.go` | background goroutine workers |
+| 5 | `cmd/api/main.go` | `async.NewAuditLogger` + `Start()`; একই ফাইলে `defer auditLogger.Stop()` (প্রসেস বের হওয়ার আগে চ্যানেল বন্ধ + ওয়ার্কার ড্রেন) |
+| 6 | `internal/platform/async/audit_logger.go` | ব্যাকগ্রাউন্ড ওয়ার্কার (`WaitGroup`), `Publish` ননব্লকিং |
 | 7 | `cmd/api/main.go` | `app.NewServer(...)` |
 | 8 | `internal/app/app.go` | Fiber app, middleware, routes wire-up |
 | 9 | `internal/app/app.go` | `app.Run(...)` → `Listen` |

@@ -80,7 +80,9 @@ Header: `Authorization: Bearer <token>`
    - `psql "$PG_DSN" -f migrations/001_init.sql`
 4. Start API:
    - `go run ./cmd/api`
-5. (Optional) Re-generate SQL layer after query changes:
+5. (Optional) Static checks before push/CI:
+   - `make lint`
+6. (Optional) Re-generate SQL layer after query changes:
    - `make sqlc`
 
 ## Load-Test Target Notes (1M requests/hour)
