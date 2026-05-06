@@ -9,6 +9,7 @@ import (
 	"github.com/storex/go-crud/internal/domain"
 	"github.com/storex/go-crud/internal/service"
 	"github.com/storex/go-crud/internal/transport/http/middleware"
+	"github.com/storex/go-crud/internal/transport/response"
 )
 
 type ItemHandler struct {
@@ -18,6 +19,7 @@ type ItemHandler struct {
 type createItemRequest struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
+	BrandID     string `json:"brand_id"`
 }
 
 func NewItemHandler(itemService *service.ItemService) *ItemHandler {
@@ -35,14 +37,23 @@ func (h *ItemHandler) Create(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusForbidden, "access denied")
 	}
 
-	item, err := h.itemService.Create(c.Context(), req.Title, req.Description, claims.Email)
+	var brandID *uuid.UUID
+	if req.BrandID != "" {
+		parsedBrandID, err := uuid.Parse(req.BrandID)
+		if err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, "invalid brand_id")
+		}
+		brandID = &parsedBrandID
+	}
+
+	item, err := h.itemService.Create(c.Context(), req.Title, req.Description, claims.Email, brandID)
 	if err != nil {
 		if err == domain.ErrInvalidItem {
 			return fiber.NewError(fiber.StatusBadRequest, "invalid item")
 		}
 		return err
 	}
-	return c.Status(fiber.StatusCreated).JSON(item)
+	return response.Single(c, fiber.StatusCreated, item)
 }
 
 func (h *ItemHandler) GetByID(c *fiber.Ctx) error {
@@ -58,20 +69,20 @@ func (h *ItemHandler) GetByID(c *fiber.Ctx) error {
 		}
 		return err
 	}
-	return c.JSON(item)
+	return response.Single(c, fiber.StatusOK, item)
 }
 
 func (h *ItemHandler) List(c *fiber.Ctx) error {
 	limit, _ := strconv.Atoi(c.Query("limit", "20"))
 	offset, _ := strconv.Atoi(c.Query("offset", "0"))
 
-	items, err := h.itemService.List(c.Context(), limit, offset)
+	items, total, page, pageLimit, err := h.itemService.List(c.Context(), limit, offset)
 	if err != nil {
 		return err
 	}
-	return c.JSON(fiber.Map{
-		"items":  items,
-		"limit":  limit,
-		"offset": offset,
+	return response.List(c, fiber.StatusOK, items, response.Pagination{
+		Page:  page,
+		Limit: pageLimit,
+		Total: total,
 	})
 }

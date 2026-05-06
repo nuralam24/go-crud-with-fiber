@@ -1,7 +1,7 @@
 # High-Performance Go CRUD (Fiber + pgx + sqlc + PgBouncer)
 
 Production-style Go API for low-latency CRUD with:
-- **Authentication** (JWT)
+- **Authentication** (JWT, DB-backed admin/user login)
 - **Authorization** (RBAC: admin can `POST`, users/admin can `GET`)
 - **Fiber** for fast HTTP handling
 - **sqlc + pgx + PgBouncer** for type-safe high-performance data access
@@ -40,7 +40,7 @@ migrations              -> SQL schema
 ```json
 {
   "email": "admin@gmail.com",
-  "password": "12345"
+  "password": "123456"
 }
 ```
 
@@ -53,6 +53,26 @@ Response:
 }
 ```
 
+### Register (User only)
+`POST /v1/auth/register`
+
+```json
+{
+  "name": "Nur",
+  "phone": "01700000000",
+  "email": "nur@gmail.com",
+  "password": "123456"
+}
+```
+
+### User Profile (Self)
+- `GET /v1/users/me`
+- `PATCH /v1/users/me`
+
+### Brands
+- `POST /v1/brands` (admin only)
+- `GET /v1/brands` (admin/user)
+
 ### Create Item (Admin only)
 `POST /v1/items`
 Header: `Authorization: Bearer <token>`
@@ -60,7 +80,8 @@ Header: `Authorization: Bearer <token>`
 ```json
 {
   "title": "item-1",
-  "description": "demo"
+  "description": "demo",
+  "brand_id": "optional-brand-uuid"
 }
 ```
 

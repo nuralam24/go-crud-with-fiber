@@ -2,13 +2,23 @@ openapi: 3.0.3
 info:
   title: Go CRUD API
   version: 1.0.0
-  description: High-performance Fiber CRUD API with JWT auth and RBAC.
+  description: High-performance Fiber CRUD API with JWT auth, user profile, and brands.
 servers:
   - url: /
+tags:
+  - name: Auth
+    description: Admin authentication endpoints
+  - name: Users
+    description: User login, registration, and profile endpoints
+  - name: Items
+    description: Item management endpoints
+  - name: Brands
+    description: Brand management endpoints
 paths:
-  /v1/auth/login:
+  /v1/auth/admin/login:
     post:
-      summary: Login and get JWT token
+      tags: [Auth]
+      summary: Admin login and get token pair
       requestBody:
         required: true
         content:
@@ -23,10 +33,10 @@ paths:
                   type: string
               example:
                 email: admin@gmail.com
-                password: "12345"
+                password: "123456"
       responses:
         "200":
-          description: Token issued
+          description: Token pair issued
           content:
             application/json:
               schema:
@@ -34,11 +44,151 @@ paths:
                 properties:
                   access_token:
                     type: string
+                  refresh_token:
+                    type: string
                   role:
                     type: string
-                    enum: [admin, user]
+                    enum: [admin]
+  /v1/auth/admin/refresh:
+    post:
+      tags: [Auth]
+      summary: Rotate admin refresh token and issue new token pair
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        "200":
+          description: Token pair rotated
+  /v1/users/login:
+    post:
+      tags: [Users]
+      summary: User login and get token pair
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+              example:
+                email: user@gmail.com
+                password: "12345678"
+      responses:
+        "200":
+          description: Token pair issued
+  /v1/users/refresh:
+    post:
+      tags: [Users]
+      summary: Rotate user refresh token and issue new token pair
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        "200":
+          description: Token pair rotated
+  /v1/users/register:
+    post:
+      tags: [Users]
+      summary: Register new user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, phone, email, password]
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "201":
+          description: User created
+  /v1/users/me:
+    get:
+      tags: [Users]
+      summary: Get my profile (user)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user profile
+    patch:
+      tags: [Users]
+      summary: Update my profile (user)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, phone]
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+      responses:
+        "200":
+          description: Updated profile
+  /v1/brands:
+    get:
+      tags: [Brands]
+      summary: List brands (admin/user)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Brand list
+    post:
+      tags: [Brands]
+      summary: Create brand (admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, slug]
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+      responses:
+        "201":
+          description: Brand created
   /v1/items:
     get:
+      tags: [Items]
       summary: List items (admin/user)
       security:
         - bearerAuth: []
@@ -57,6 +207,7 @@ paths:
         "200":
           description: Item list
     post:
+      tags: [Items]
       summary: Create item (admin only)
       security:
         - bearerAuth: []
@@ -72,11 +223,16 @@ paths:
                   type: string
                 description:
                   type: string
+                brand_id:
+                  type: string
+                  format: uuid
+                  nullable: true
       responses:
         "201":
           description: Item created
   /v1/items/{id}:
     get:
+      tags: [Items]
       summary: Get item by id (admin/user)
       security:
         - bearerAuth: []

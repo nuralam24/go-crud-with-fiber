@@ -15,9 +15,10 @@ import (
 var ErrNotFound = errors.New("resource not found")
 
 type ItemRepository interface {
-	Create(ctx context.Context, item domain.Item) (domain.Item, error)
+	Create(ctx context.Context, item domain.Item, brandID *uuid.UUID) (domain.Item, error)
 	GetByID(ctx context.Context, id uuid.UUID) (domain.Item, error)
 	List(ctx context.Context, limit int, offset int) ([]domain.Item, error)
+	Count(ctx context.Context) (int, error)
 }
 
 type ItemService struct {
@@ -32,7 +33,7 @@ func NewItemService(repo ItemRepository, auditLogger *async.AuditLogger) *ItemSe
 	}
 }
 
-func (s *ItemService) Create(ctx context.Context, title string, description string, actor string) (domain.Item, error) {
+func (s *ItemService) Create(ctx context.Context, title string, description string, actor string, brandID *uuid.UUID) (domain.Item, error) {
 	item := domain.Item{
 		ID:          uuid.New(),
 		Title:       title,
@@ -42,7 +43,7 @@ func (s *ItemService) Create(ctx context.Context, title string, description stri
 		return domain.Item{}, err
 	}
 
-	created, err := s.repo.Create(ctx, item)
+	created, err := s.repo.Create(ctx, item, brandID)
 	if err != nil {
 		return domain.Item{}, fmt.Errorf("create item: %w", err)
 	}
@@ -67,7 +68,7 @@ func (s *ItemService) GetByID(ctx context.Context, id uuid.UUID) (domain.Item, e
 	return item, nil
 }
 
-func (s *ItemService) List(ctx context.Context, limit int, offset int) ([]domain.Item, error) {
+func (s *ItemService) List(ctx context.Context, limit int, offset int) ([]domain.Item, int, int, int, error) {
 	if limit <= 0 {
 		limit = 20
 	}
@@ -77,5 +78,15 @@ func (s *ItemService) List(ctx context.Context, limit int, offset int) ([]domain
 	if offset < 0 {
 		offset = 0
 	}
-	return s.repo.List(ctx, limit, offset)
+
+	items, err := s.repo.List(ctx, limit, offset)
+	if err != nil {
+		return nil, 0, 0, 0, err
+	}
+	total, err := s.repo.Count(ctx)
+	if err != nil {
+		return nil, 0, 0, 0, err
+	}
+	page := (offset / limit) + 1
+	return items, total, page, limit, nil
 }

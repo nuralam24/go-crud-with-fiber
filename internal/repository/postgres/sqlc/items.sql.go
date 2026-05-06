@@ -9,27 +9,47 @@ import (
 	"context"
 
 	uuid "github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countItems = `-- name: CountItems :one
+SELECT COUNT(*)::bigint
+FROM items
+`
+
+func (q *Queries) CountItems(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countItems)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const createItem = `-- name: CreateItem :one
-INSERT INTO items (id, title, description)
-VALUES ($1, $2, $3)
-RETURNING id, title, description, created_at, updated_at
+INSERT INTO items (id, title, description, brand_id)
+VALUES ($1, $2, $3, $4)
+RETURNING id, title, description, brand_id, created_at, updated_at
 `
 
 type CreateItemParams struct {
-	ID          uuid.UUID `json:"id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
+	ID          uuid.UUID   `json:"id"`
+	Title       string      `json:"title"`
+	Description string      `json:"description"`
+	BrandID     pgtype.UUID `json:"brand_id"`
 }
 
 func (q *Queries) CreateItem(ctx context.Context, arg CreateItemParams) (Item, error) {
-	row := q.db.QueryRow(ctx, createItem, arg.ID, arg.Title, arg.Description)
+	row := q.db.QueryRow(ctx, createItem,
+		arg.ID,
+		arg.Title,
+		arg.Description,
+		arg.BrandID,
+	)
 	var i Item
 	err := row.Scan(
 		&i.ID,
 		&i.Title,
 		&i.Description,
+		&i.BrandID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -37,28 +57,62 @@ func (q *Queries) CreateItem(ctx context.Context, arg CreateItemParams) (Item, e
 }
 
 const getItemByID = `-- name: GetItemByID :one
-SELECT id, title, description, created_at, updated_at
-FROM items
-WHERE id = $1
+SELECT i.id,
+       i.title,
+       i.description,
+       i.brand_id,
+       i.created_at,
+       i.updated_at,
+       b.id AS brand_ref_id,
+       b.name AS brand_name,
+       b.slug AS brand_slug
+FROM items i
+LEFT JOIN brands b ON b.id = i.brand_id
+WHERE i.id = $1
 `
 
-func (q *Queries) GetItemByID(ctx context.Context, id uuid.UUID) (Item, error) {
+type GetItemByIDRow struct {
+	ID          uuid.UUID          `json:"id"`
+	Title       string             `json:"title"`
+	Description string             `json:"description"`
+	BrandID     pgtype.UUID        `json:"brand_id"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	BrandRefID  pgtype.UUID        `json:"brand_ref_id"`
+	BrandName   pgtype.Text        `json:"brand_name"`
+	BrandSlug   pgtype.Text        `json:"brand_slug"`
+}
+
+func (q *Queries) GetItemByID(ctx context.Context, id uuid.UUID) (GetItemByIDRow, error) {
 	row := q.db.QueryRow(ctx, getItemByID, id)
-	var i Item
+	var i GetItemByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Title,
 		&i.Description,
+		&i.BrandID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BrandRefID,
+		&i.BrandName,
+		&i.BrandSlug,
 	)
 	return i, err
 }
 
 const listItems = `-- name: ListItems :many
-SELECT id, title, description, created_at, updated_at
-FROM items
-ORDER BY created_at DESC
+SELECT i.id,
+       i.title,
+       i.description,
+       i.brand_id,
+       i.created_at,
+       i.updated_at,
+       b.id AS brand_ref_id,
+       b.name AS brand_name,
+       b.slug AS brand_slug
+FROM items i
+LEFT JOIN brands b ON b.id = i.brand_id
+ORDER BY i.created_at DESC
 LIMIT $1 OFFSET $2
 `
 
@@ -67,21 +121,37 @@ type ListItemsParams struct {
 	Offset int32 `json:"offset"`
 }
 
-func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]Item, error) {
+type ListItemsRow struct {
+	ID          uuid.UUID          `json:"id"`
+	Title       string             `json:"title"`
+	Description string             `json:"description"`
+	BrandID     pgtype.UUID        `json:"brand_id"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	BrandRefID  pgtype.UUID        `json:"brand_ref_id"`
+	BrandName   pgtype.Text        `json:"brand_name"`
+	BrandSlug   pgtype.Text        `json:"brand_slug"`
+}
+
+func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListItemsRow, error) {
 	rows, err := q.db.Query(ctx, listItems, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Item
+	var items []ListItemsRow
 	for rows.Next() {
-		var i Item
+		var i ListItemsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Title,
 			&i.Description,
+			&i.BrandID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.BrandRefID,
+			&i.BrandName,
+			&i.BrandSlug,
 		); err != nil {
 			return nil, err
 		}

@@ -23,10 +23,10 @@ type Config struct {
 	PGMaxConnLifetime     time.Duration
 	PGMaxConnIdleTime     time.Duration
 	JWTSecret             string
-	AdminEmail            string
-	AdminPassword         string
-	UserEmail             string
-	UserPassword          string
+	AccessTokenTTL        time.Duration
+	RefreshTokenTTL       time.Duration
+	MaxLoginAttempts      int
+	LoginLockoutDuration  time.Duration
 	AuditBufferSize       int
 	AuditWorkerGoroutines int
 }
@@ -48,10 +48,10 @@ func Load() Config {
 		PGMaxConnLifetime:     getDuration("PG_MAX_CONN_LIFETIME", 15*time.Minute),
 		PGMaxConnIdleTime:     getDuration("PG_MAX_CONN_IDLE_TIME", 3*time.Minute),
 		JWTSecret:             mustGet("JWT_SECRET"),
-		AdminEmail:            getString("ADMIN_EMAIL", "admin@gmail.com"),
-		AdminPassword:         getString("ADMIN_PASSWORD", "12345"),
-		UserEmail:             getString("USER_EMAIL", "user@gmail.com"),
-		UserPassword:          getString("USER_PASSWORD", "12345"),
+		AccessTokenTTL:        getDuration("ACCESS_TOKEN_TTL", 30*time.Minute),
+		RefreshTokenTTL:       getDuration("REFRESH_TOKEN_TTL", 168*time.Hour),
+		MaxLoginAttempts:      getInt("MAX_LOGIN_ATTEMPTS", 5),
+		LoginLockoutDuration:  getDuration("LOGIN_LOCKOUT_DURATION", 15*time.Minute),
 		AuditBufferSize:       getInt("AUDIT_BUFFER_SIZE", 8192),
 		AuditWorkerGoroutines: getInt("AUDIT_WORKERS", 4),
 	}

@@ -6,6 +6,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/storex/go-crud/internal/service"
+	"github.com/storex/go-crud/internal/transport/apierror"
 )
 
 const claimsContextKey = "claims"
@@ -14,17 +15,17 @@ func Authenticate(authService *service.AuthService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {
-			return fiber.NewError(fiber.StatusUnauthorized, "missing authorization header")
+			return apierror.New(fiber.StatusUnauthorized, "missing_authorization", "missing authorization header")
 		}
 
 		token := strings.TrimPrefix(authHeader, "Bearer ")
 		if token == authHeader || strings.TrimSpace(token) == "" {
-			return fiber.NewError(fiber.StatusUnauthorized, "invalid authorization header")
+			return apierror.New(fiber.StatusUnauthorized, "invalid_authorization", "invalid authorization header")
 		}
 
 		claims, err := authService.ParseToken(token)
 		if err != nil {
-			return fiber.NewError(fiber.StatusUnauthorized, "invalid token")
+			return apierror.New(fiber.StatusUnauthorized, "invalid_token", "invalid token")
 		}
 		c.Locals(claimsContextKey, claims)
 		return c.Next()
@@ -40,11 +41,11 @@ func Authorize(allowedRoles ...service.Role) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		claims, ok := c.Locals(claimsContextKey).(*service.Claims)
 		if !ok {
-			return fiber.NewError(fiber.StatusForbidden, "access denied")
+			return apierror.New(fiber.StatusForbidden, "forbidden", "access denied")
 		}
 
 		if _, exists := roleSet[claims.Role]; !exists {
-			return fiber.NewError(fiber.StatusForbidden, "insufficient permissions")
+			return apierror.New(fiber.StatusForbidden, "insufficient_permissions", "insufficient permissions")
 		}
 
 		return c.Next()

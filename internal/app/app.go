@@ -20,17 +20,26 @@ import (
 
 func NewServer(cfg config.Config, logger *slog.Logger, pool *pgxpool.Pool, auditLogger *async.AuditLogger) *fiber.App {
 	itemRepo := repopg.NewItemRepository(pool)
+	authRepo := repopg.NewAuthRepository(pool)
+	userRepo := repopg.NewUserRepository(pool)
+	brandRepo := repopg.NewBrandRepository(pool)
+
 	itemService := service.NewItemService(itemRepo, auditLogger)
+	userService := service.NewUserService(userRepo)
+	brandService := service.NewBrandService(brandRepo)
 	authService := service.NewAuthService(
 		cfg.JWTSecret,
-		cfg.AdminEmail,
-		cfg.AdminPassword,
-		cfg.UserEmail,
-		cfg.UserPassword,
+		authRepo,
+		cfg.AccessTokenTTL,
+		cfg.RefreshTokenTTL,
+		cfg.MaxLoginAttempts,
+		cfg.LoginLockoutDuration,
 	)
 
 	authHandler := handler.NewAuthHandler(authService)
 	itemHandler := handler.NewItemHandler(itemService)
+	userHandler := handler.NewUserHandler(userService, authService)
+	brandHandler := handler.NewBrandHandler(brandService)
 	healthHandler := handler.NewHealthHandler(pool)
 
 	app := fiber.New(fiber.Config{
@@ -51,7 +60,7 @@ func NewServer(cfg config.Config, logger *slog.Logger, pool *pgxpool.Pool, audit
 	app.Use(observemw.RequestIdentity())
 	app.Use(observemw.RequestLogger(logger))
 
-	httptransport.RegisterRoutes(app, authHandler, itemHandler, healthHandler, authService)
+	httptransport.RegisterRoutes(app, authHandler, itemHandler, userHandler, brandHandler, healthHandler, authService)
 	httptransport.RegisterSwaggerRoutes(app)
 
 	return app
