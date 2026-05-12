@@ -35,7 +35,7 @@ migrations              -> SQL schema
 ## API
 
 ### Login
-`POST /v1/auth/login`
+`POST /api/v1/auth/login`
 
 ```json
 {
@@ -54,7 +54,7 @@ Response:
 ```
 
 ### Register (User only)
-`POST /v1/auth/register`
+`POST /api/v1/auth/register`
 
 ```json
 {
@@ -66,15 +66,15 @@ Response:
 ```
 
 ### User Profile (Self)
-- `GET /v1/users/me`
-- `PATCH /v1/users/me`
+- `GET /api/v1/users/me`
+- `PATCH /api/v1/users/me`
 
 ### Brands
-- `POST /v1/brands` (admin only)
-- `GET /v1/brands` (admin/user)
+- `POST /api/v1/brands` (admin only)
+- `GET /api/v1/brands` (admin/user)
 
 ### Create Item (Admin only)
-`POST /v1/items`
+`POST /api/v1/items`
 Header: `Authorization: Bearer <token>`
 
 ```json
@@ -86,10 +86,10 @@ Header: `Authorization: Bearer <token>`
 ```
 
 ### List Items (User/Admin)
-`GET /v1/items?limit=20&offset=0`
+`GET /api/v1/items?limit=20&offset=0`
 
 ### Get Item By ID (User/Admin)
-`GET /v1/items/:id`
+`GET /api/v1/items/:id`
 
 ## Run
 

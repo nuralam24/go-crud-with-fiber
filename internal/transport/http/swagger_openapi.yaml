@@ -2,7 +2,9 @@ openapi: 3.0.3
 info:
   title: Go CRUD API
   version: 1.0.0
-  description: High-performance Fiber CRUD API with JWT auth, user profile, and brands.
+  description: |
+    High-performance Fiber CRUD API. <br>
+    Fiber + pgx + sqlc CRUD API with JWT access/refresh tokens.
 servers:
   - url: /
 tags:
@@ -15,7 +17,7 @@ tags:
   - name: Brands
     description: Brand management endpoints
 paths:
-  /v1/auth/admin/login:
+  /api/v1/auth/admin/login:
     post:
       tags: [Auth]
       summary: Admin login and get token pair
@@ -49,7 +51,7 @@ paths:
                   role:
                     type: string
                     enum: [admin]
-  /v1/auth/admin/refresh:
+  /api/v1/auth/admin/refresh:
     post:
       tags: [Auth]
       summary: Rotate admin refresh token and issue new token pair
@@ -66,7 +68,7 @@ paths:
       responses:
         "200":
           description: Token pair rotated
-  /v1/users/login:
+  /api/v1/users/login:
     post:
       tags: [Users]
       summary: User login and get token pair
@@ -88,7 +90,7 @@ paths:
       responses:
         "200":
           description: Token pair issued
-  /v1/users/refresh:
+  /api/v1/users/refresh:
     post:
       tags: [Users]
       summary: Rotate user refresh token and issue new token pair
@@ -105,7 +107,7 @@ paths:
       responses:
         "200":
           description: Token pair rotated
-  /v1/users/register:
+  /api/v1/users/register:
     post:
       tags: [Users]
       summary: Register new user account
@@ -128,7 +130,7 @@ paths:
       responses:
         "201":
           description: User created
-  /v1/users/me:
+  /api/v1/users/me:
     get:
       tags: [Users]
       summary: Get my profile (user)
@@ -157,7 +159,7 @@ paths:
       responses:
         "200":
           description: Updated profile
-  /v1/brands:
+  /api/v1/brands:
     get:
       tags: [Brands]
       summary: List brands (admin/user)
@@ -186,7 +188,7 @@ paths:
       responses:
         "201":
           description: Brand created
-  /v1/items:
+  /api/v1/items:
     get:
       tags: [Items]
       summary: List items (admin/user)
@@ -230,7 +232,7 @@ paths:
       responses:
         "201":
           description: Item created
-  /v1/items/{id}:
+  /api/v1/items/{id}:
     get:
       tags: [Items]
       summary: Get item by id (admin/user)

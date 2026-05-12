@@ -1,281 +1,254 @@
-# Go CRUD Project Full Guide (Beginner Friendly)
+# Go CRUD (Fiber) — Project guide
 
-এই ডকুমেন্টটি এমনভাবে লেখা হয়েছে যেন Go সম্পর্কে আগে থেকে ধারণা না থাকলেও পুরো প্রজেক্টটা বোঝা যায়।
+This document is the **entry point** for understanding the repository. Deeper topics are split across linked files.
 
 **Related docs**
-- আর্কিটেকচার (লেয়ার, ডায়াগ্রাম, স্কেলিং নোট): [`ARCHITECTURE.md`](./ARCHITECTURE.md)
-- HTTP request → response (ফাইল বাই ফাইল): [`REQUEST_LIFECYCLE.md`](./REQUEST_LIFECYCLE.md)
-- শেখার টপিক (এই প্রজেক্ট থেকে নিজের প্রজেক্ট): [`LEARNING_TOPICS.md`](./LEARNING_TOPICS.md)
+
+- Architecture (layers, diagrams, scaling): [`ARCHITECTURE.md`](./ARCHITECTURE.md)  
+- HTTP request → response (file-by-file): [`REQUEST_LIFECYCLE.md`](./REQUEST_LIFECYCLE.md)  
+- Learning topics: [`LEARNING_TOPICS.md`](./LEARNING_TOPICS.md)  
 
 ---
 
-## 1) Project ta ki?
+## 1) What is this project?
 
-এটা একটি **high-performance CRUD API** project, যেটা Go language + Fiber framework দিয়ে বানানো।
+A **Go + Fiber** REST API with PostgreSQL (**pgx** / **pgxpool**), **sqlc** for typed SQL, **JWT** access and refresh tokens, and **role-based** access for **admin** and **user**.
 
-Main features:
-- Login করে JWT token নেওয়া
-- Role-based access:
-  - `admin` -> `POST /v1/items` করতে পারে
-  - `admin` + `user` -> `GET /v1/items`, `GET /v1/items/:id` করতে পারে
-- PostgreSQL (Neon compatible) database
-- Swagger UI দিয়ে API test
-- Watch mode (`make watch`) দিয়ে auto-reload development
+Highlights:
+
+- Admin and user auth (login + refresh), user registration
+- **Items**: list and get (admin + user), create (**admin only**) — no item update/delete routes in the current router
+- **Brands**: list (admin + user), create (**admin only**) — no brand get-by-id / update / delete routes in the current router
+- User profile: `GET` / `PATCH` `/api/v1/users/me` (**user** role)
+- **Swagger UI** and embedded **OpenAPI** under `/api/docs`
+- **Air** watch mode (`make watch`) for local development
+
+Module: **`github.com/storex/go-crud`**
 
 ---
 
 ## 2) Tech stack
 
-- **Language:** Go
-- **HTTP framework:** Fiber
-- **DB driver/pool:** pgx + pgxpool
-- **SQL code generation:** sqlc (typed query layer)
-- **DB proxy compatibility:** PgBouncer-friendly config
-- **Auth:** JWT
-- **API docs:** Swagger (OpenAPI)
-- **Hot reload:** Air
-- **Logging:** structured JSON log (`log/slog`)
+| Area | Technology |
+|------|------------|
+| Language | Go |
+| HTTP | **Fiber v2** |
+| DB | **pgx/v5** `pgxpool` (PgBouncer-friendly simple protocol where configured) |
+| SQL | **sqlc** (generated queries under `internal/repository/postgres/sqlc`) |
+| Auth | **JWT** (HS256), bcrypt; refresh tokens stored hashed |
+| API docs | Embedded `swagger_openapi.yaml` + Swagger UI (CDN) |
+| Hot reload | **Air** (`.air.toml`) |
+| Logging | **`log/slog`** JSON to stdout |
 
 ---
 
-## 3) Folder structure (কোন folder কেন)
+## 3) Folder structure
 
 ### `cmd/`
-Application entrypoint রাখার standard জায়গা।
 
-- `cmd/api/main.go`
-  - app start করে
-  - config load করে
-  - DB connect করে
-  - server run করে
+- **`cmd/api/main.go`** — Loads config, connects to Postgres, starts the audit logger, builds the Fiber app, runs until shutdown.
 
 ### `internal/`
-Business/application related সব core code এখানে। `internal` মানে project-এর বাইরে থেকে import করা যাবে না (Go best practice)।
 
-- `internal/app/`
-  - `app.go`
-  - Application composition root
-  - সব dependency এক জায়গায় wire-up করা হয় (repo, service, handler, middleware)
+Go **`internal/`** convention: code here is not importable by other modules.
 
-- `internal/config/`
-  - `config.go`
-  - `.env`/environment variable থেকে config পড়ে typed struct বানায়
-  - timeouts, DB config, JWT secret, credentials ইত্যাদি এখান থেকে আসে
-
-- `internal/domain/`
-  - `item.go`
-  - business entity (`Item`) এবং validation rules
-
-- `internal/repository/postgres/`
-  - `item_repository.go`
-  - repository wrapper layer
-  - service/domain friendly format-এ data map করে
-
-- `internal/repository/postgres/sqlc/`
-  - sqlc generated Go files (auto-generated, hand-edit না করা)
-  - compile-time type-safe query methods
-  - low-level DB read/write implementation
-
-- `internal/service/`
-  - `auth_service.go`: login, JWT generate/parse, role claims
-  - `item_service.go`: item create/list/get business logic
-  - service layer repository call করে এবং business rule enforce করে
-
-- `internal/platform/`
-  - cross-cutting infra concern
-  - `db/postgres.go`: pgxpool init + ping/retry logic
-  - `async/audit_logger.go`: goroutine worker pool; `Start()` / `Stop()` দিয়ে লাইফসাইকেল; `Publish` ননব্লকিং
-
-- `internal/transport/http/`
-  - HTTP/API layer
-  - `router.go`: route map করে
-  - `error_handler.go`: central error handler
-  - `swagger.go`: swagger page serve করে
-  - `swagger_openapi.yaml`: API docs schema
-  - `handler/`: request->service call
-  - `middleware/`: auth, RBAC, request log, request id etc.
+| Path | Role |
+|------|------|
+| **`internal/app/app.go`** | Composition root: Fiber app, global middleware, `RegisterRoutes`, `RegisterSwaggerRoutes`, `Run` (listen + graceful shutdown) |
+| **`internal/config/`** | Environment → typed `Config` (timeouts, DSN, JWT, pool limits, audit workers) |
+| **`internal/domain/`** | Entities and validation (e.g. items, brands, users) |
+| **`internal/service/`** | Use cases: auth, users, items, brands |
+| **`internal/repository/postgres/`** | Adapters: sqlc + mapping to domain types |
+| **`internal/repository/postgres/sqlc/`** | **Generated** — do not edit by hand; run `make sqlc` |
+| **`internal/platform/db/`** | Pool creation, ping / retry |
+| **`internal/platform/async/`** | Buffered audit logger (`Start` / `Stop`, non-blocking `Publish`) |
+| **`internal/transport/http/`** | Routes, handlers, middleware, **`error_handler.go`**, `swagger.go`, embedded OpenAPI |
+| **`internal/transport/response/`** | Success JSON envelope (`response.Single`, etc.) |
 
 ### `migrations/`
-- `001_init.sql`
-- DB table/index create script
+
+- **`001_init.sql`** — DDL for the real database (applied with `make migrate` or your own process).
 
 ### `db/`
-- `db/schema/`
-  - sqlc-এর জন্য schema source
-- `db/query/`
-  - sqlc query files (`-- name: ...` style)
 
-### Root files
+- **`db/schema/`** — Schema input for **sqlc** (compile-time typing; not applied to the DB at runtime).
+- **`db/query/`** — SQL query definitions for sqlc.
 
-- `.env` -> local runtime secret/config (gitignore করা)
-- `.env.example` -> sample config (real secret ছাড়া)
-- `.gitignore` -> কোন file git-এ যাবে না
-- `Makefile` -> shortcut commands (`run`, `watch`, `build`, `test`, `fmt`, `lint`, `migrate`, `sqlc`)
-- `.golangci.yml` -> golangci-lint লিন্টার সেট (`make lint`)
-- `sqlc.yaml` -> sqlc configuration
-- `.air.toml` -> watch mode config
-- `README.md` -> quick overview
-- `DOCS.md` -> full guide (এই file)
+### Repository root
 
----
+| File | Purpose |
+|------|---------|
+| `.env` | Local secrets (gitignored) |
+| `.env.example` | Example variables (no real secrets) |
+| `Makefile` | `run`, `watch`, `build`, `test`, `fmt`, `lint`, `migrate`, `sqlc` (see section 11) |
+| `.golangci.yml` | golangci-lint configuration |
+| `sqlc.yaml` | sqlc project config |
+| `.air.toml` | Air watch configuration |
 
-## 4) Request flow (high-level)
-
-উদাহরণ: `GET /v1/items`
-
-1. Request আসে Fiber app-এ
-2. Middleware run হয়:
-   - request id
-   - request logging
-   - auth token validate
-   - role authorize
-3. HTTP handler request parse করে service call করে
-4. Service repository call করে
-5. Repository sqlc generated query call করে DB query run করে
-6. Data response হিসেবে client এ ফিরে যায়
-7. Error হলে centralized error handler JSON error return করে
+The **Makefile** optionally **`include`s** `.env` and **`export`s** variables so tools like `make migrate` see `PG_DSN` when defined there.
 
 ---
 
-## 5) API endpoints
+## 4) Request flow (high level)
 
-### Auth
-- `POST /v1/auth/login`
-  - body: `{ "email": "...", "password": "..." }`
-  - response: `{ "access_token": "...", "role": "admin|user" }`
+Example: `GET /api/v1/items`
 
-### Item
-- `POST /v1/items` (admin only)
-- `GET /v1/items` (admin/user)
-- `GET /v1/items/:id` (admin/user)
-
-### Health
-- `GET /healthz` -> process live আছে কিনা
-- `GET /readyz` -> DB reachable কিনা
-
-### Docs
-- `GET /swagger`
-- `GET /openapi.yaml`
+1. Request hits the Fiber app.
+2. Global middleware: **CORS** → **request ID** → **request logging**.
+3. Route group middleware: **JWT authenticate** (protected routes), then **authorize** by role.
+4. Handler parses query/body and calls the **service** layer.
+5. Service calls the **repository** → **sqlc** → PostgreSQL.
+6. Handler returns **`response.Single`** / JSON success shape.
+7. Errors bubble to Fiber’s **`ErrorHandler`** (`error_handler.go`) for a consistent JSON error body.
 
 ---
 
-## 6) Auth & Role details
+## 5) API endpoints (current router)
 
-Login successful হলে JWT token generate হয়।  
-এই token `Authorization: Bearer <token>` header এ পাঠাতে হয়।
+Base path for versioned JSON API: **`/api/v1`**. Default server: **`http://127.0.0.1:8080`** (`HTTP_ADDR`, default `:8080`).
 
-Role claim token-এর ভেতরে থাকে:
-- `admin`
-- `user`
+### Public / unversioned
 
-RBAC middleware role check করে route access allow/deny করে।
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | Service metadata + `swagger_ui`, `openapi_spec`, `api_base` |
+| GET | `/healthz` | Liveness |
+| GET | `/readyz` | Readiness (DB ping) |
+
+### Public under `/api/v1`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/auth/admin/login` | Admin login (email/password) |
+| POST | `/api/v1/auth/admin/refresh` | Admin refresh token |
+| POST | `/api/v1/users/register` | User registration |
+| POST | `/api/v1/users/login` | User login |
+| POST | `/api/v1/users/refresh` | User refresh token |
+
+### Protected (requires `Authorization: Bearer <access_token>`)
+
+| Method | Path | Roles |
+|--------|------|-------|
+| GET | `/api/v1/items` | admin, user |
+| GET | `/api/v1/items/:id` | admin, user |
+| POST | `/api/v1/items` | **admin only** |
+| GET | `/api/v1/brands` | admin, user |
+| POST | `/api/v1/brands` | **admin only** |
+| GET | `/api/v1/users/me` | **user only** |
+| PATCH | `/api/v1/users/me` | **user only** |
+
+### Docs and redirects
+
+| Path | Behavior |
+|------|----------|
+| `/api/docs` | Swagger UI |
+| `/api/docs/openapi.yaml` | OpenAPI YAML |
+| `/swagger`, `/docs` | Redirect to `/api/docs` |
+| `/openapi.yaml` | Redirect to `/api/docs/openapi.yaml` |
+
+For request/response schemas, use **Swagger** at **`/api/docs`**.
 
 ---
 
-## 7) Database details
+## 6) Auth and roles
 
-Table: `items`
-- `id` (UUID, PK)
-- `title`
-- `description`
-- `created_at`
-- `updated_at`
+Send **`Authorization: Bearer <access_token>`** on protected routes.
 
-Index:
-- `created_at DESC` index list endpoint কে efficient করে।
+JWT claims include **role** (`admin` or `user`). Middleware **`Authenticate`** validates the token; **`Authorize`** enforces allowed roles per route.
 
-sqlc flow:
-1. `db/schema` + `db/query` update করো
-2. `make sqlc` run করো
-3. generated code `internal/repository/postgres/sqlc` এ update হবে
+Admin login response includes **`access_token`**, **`refresh_token`**, and **`role`** (see `handler/auth_handler.go`).
+
+---
+
+## 7) Database and sqlc
+
+- Apply **`migrations/001_init.sql`** to your Postgres instance (`make migrate` if `PG_DSN` is set — see Makefile).
+- After changing **`db/query`** or **`db/schema`**, run **`make sqlc`** to regenerate `internal/repository/postgres/sqlc/`.
+
+Keep **migration DDL** and **sqlc schema** in sync when you change tables.
 
 ---
 
 ## 8) Error handling
 
-Central error handler:
-- সব unhandled error কে consistent JSON format-এ return করে
-- internal error হলে sanitized message দেয়
-- `request_id` response-এ attach হয় (debug trace)
-- console log-এ structured error print হয়
+Fiber **`ErrorHandler`** (`internal/transport/http/error_handler.go`) maps **`apierror.Error`**, **`fiber.Error`**, and other errors to JSON:
+
+- `success: false`
+- `error`: `code`, `http_status`, `message`, `data`
+- `meta`: `request_id`, `timestamp`
+
+5xx responses are logged with **`slog`**.
 
 ---
 
-## 9) Logging & observability
+## 9) Logging and observability
 
-Project structured JSON log ব্যবহার করে।
+Structured JSON logs via **`log/slog`**.
 
-প্রতি request এ log fields থাকে:
-- method
-- path
-- status
-- latency
-- ip
-- request_id
-
-এই approach production debugging/monitoring এ অনেক helpful।
+Per-request access logs (after the handler runs) include method, path, status, latency, client IP, and **`request_id`** (see `middleware/observability.go`).
 
 ---
 
-## 10) Run guide (step-by-step)
+## 10) How to run
 
-1. env configure:
-   - `.env` file update
-   - `PG_DSN`, `JWT_SECRET` set
+1. Copy **`.env.example`** to **`.env`** and set at least **`PG_DSN`** and **`JWT_SECRET`** (see `internal/config/config.go` for all options).
+2. Apply migrations:
 
-2. migration:
 ```bash
 make migrate
 ```
 
-3. normal run:
+3. Run the API:
+
 ```bash
 make run
 ```
 
-4. watch mode:
+4. Watch mode (rebuild on change):
+
 ```bash
 make watch
 ```
 
-5. docs open:
-- `http://127.0.0.1:8080/swagger`
+5. Open docs: **`http://127.0.0.1:8080/api/docs`**
+
+**CORS** in `internal/app/app.go` is configured for **`http://127.0.0.1:8080`** and **`http://localhost:8080`**. If you change **`HTTP_ADDR`**, update CORS origins to match your browser origin.
 
 ---
 
-## 11) Make commands
+## 11) Makefile targets
 
-- `make run` -> app start
-- `make watch` -> auto-reload dev mode
-- `make build` -> build check
-- `make test` -> test run
-- `make fmt` -> go fmt
-- `make migrate` -> migration apply
-- `make sqlc` -> SQL থেকে typed code generate
-
----
-
-## 12) Professional notes (why this is good)
-
-এই project-এ already কিছু strong professional pattern আছে:
-- layered architecture
-- centralized config
-- clean repository/service split
-- middleware based auth/authorization
-- structured logging
-- readiness/liveness health endpoints
-- swagger contract
-
-আরও enterprise-level করতে চাইলে next:
-- DB-backed user table + hashed password
-- refresh token flow
-- metrics (Prometheus)
-- tracing (OpenTelemetry)
-- integration tests (testcontainers)
+| Target | Purpose |
+|--------|---------|
+| `make run` | Run `cmd/api` |
+| `make watch` | Install Air if needed, run Air |
+| `make build` | `go build ./...` |
+| `make test` | `go test ./...` |
+| `make fmt` | `go fmt ./...` |
+| `make lint` | golangci-lint |
+| `make migrate` | `psql "$(PG_DSN)" -f migrations/001_init.sql` |
+| `make sqlc` | Regenerate sqlc code |
 
 ---
 
-## 13) Quick mental model (এক লাইনে)
+## 12) Why this layout helps
 
-**Handler request নেয় -> Service business rule চালায় -> Repository DB query করে -> Response ফেরত দেয়.**
+Patterns already in the repo:
 
+- Layered architecture (transport → service → repository)
+- Central configuration from environment
+- JWT + RBAC middleware
+- Structured logging and health endpoints
+- OpenAPI contract + Swagger UI
+
+Possible next steps (not required for local dev):
+
+- Metrics (Prometheus), tracing (OpenTelemetry)
+- Broader integration tests (e.g. testcontainers)
+- Additional CRUD routes if you want parity with other services
+
+---
+
+## 13) Mental model (one line)
+
+**Handlers parse HTTP → services enforce rules → repositories + sqlc talk to Postgres → success responses use `response` helpers; errors use Fiber’s centralized error handler.**

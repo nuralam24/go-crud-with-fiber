@@ -1,354 +1,266 @@
-# এই প্রজেক্ট থেকে যা শিখলে নিজের প্রজেক্ট করতে পারবে
+# What you can learn from this project (Fiber)
 
-এই ডকের লক্ষ্য: **Go এর হাজার হাজার টপিক না**, বরং **এই কোডবেজে যা যা ব্যবহার হয়েছে** — সেগুলো ভালোভাবে বুঝলে তুমি একই ধরনের API/সার্ভিস নিজে বানাতে পারবে।
+This document lists **topics the codebase actually uses**. Understanding them well is enough to build similar HTTP APIs in Go.
 
-প্রতিটি সেকশনে আছে: **কী শিখবে**, **এই প্রজেক্টে কোথায় দেখা যায়**, **নিজে প্র্যাকটিস করলে কী করবে**।
+Each section includes: **what to learn**, **where it appears here**, **practice ideas**.
 
 ---
 
-## টপিক ম্যাপ (দ্রুত তালিকা)
+## Topic map (quick index)
 
-| # | টপিক | প্রধান ফাইল / ফোল্ডার |
+| # | Topic | Main files / folders |
 |---|--------|------------------------|
-| 1 | Go মডিউল, `package`, `internal/` | `go.mod`, `cmd/`, `internal/` |
-| 2 | `main`, বুটস্ট্র্যাপ, কম্পোজিশন | `cmd/api/main.go`, `internal/app/app.go` |
+| 1 | Go modules, `package`, `internal/` | `go.mod`, `cmd/`, `internal/` |
+| 2 | `main`, bootstrap, composition | `cmd/api/main.go`, `internal/app/app.go` |
 | 3 | `defer` | `cmd/api/main.go` |
-| 4 | `context.Context` | `cmd/api/main.go`, `internal/app/app.go`, handlers, DB |
-| 5 | সিগনাল + গ্রেসফুল শাটডাউন | `cmd/api/main.go`, `internal/app/app.go` |
-| 6 | স্ট্রাক্ট, কনস্ট্রাক্টর `New*` | সব লেয়ার |
-| 7 | ইন্টারফেস + ডিপেন্ডেন্সি দিক নির্দেশ | `internal/service/item_service.go` |
-| 8 | এরর হ্যান্ডলিং | `internal/service/`, `internal/transport/http/error_handler.go` |
-| 9 | JSON + HTTP (Fiber) | `internal/transport/http/handler/` |
-| 10 | মিডলওয়্যার চেইন | `internal/app/app.go`, `internal/transport/http/middleware/` |
-| 11 | JWT অথেন্টিকেশন | `internal/service/auth_service.go`, `middleware/auth.go` |
-| 12 | RBAC (রোল চেক) | `internal/transport/http/middleware/auth.go` |
+| 4 | `context.Context` | `main`, `app.Run`, handlers, DB |
+| 5 | Signals + graceful shutdown | `cmd/api/main.go`, `internal/app/app.go` |
+| 6 | Structs, `New*` constructors | All layers |
+| 7 | Small interfaces + dependency direction | `internal/service/*_service.go` |
+| 8 | Errors: `apierror`, `fiber.Error`, `ErrorHandler` | `handler/`, `error_handler.go`, `service/` |
+| 9 | JSON + Fiber handlers | `internal/transport/http/handler/` |
+| 10 | Middleware chain | `internal/app/app.go`, `middleware/` |
+| 11 | JWT authentication | `internal/service/auth_service.go`, `middleware/auth.go` |
+| 12 | RBAC | `middleware/auth.go` |
 | 13 | PostgreSQL + `pgxpool` | `internal/platform/db/postgres.go` |
-| 14 | `sqlc` ওয়ার্কফ্লো | `db/`, `sqlc.yaml`, `internal/repository/postgres/` |
-| 15 | ডোমেইন ভ্যালিডেশন | `internal/domain/item.go` |
-| 16 | গোরুটিন, চ্যানেল, `select`, `sync.WaitGroup` | `internal/platform/async/audit_logger.go` |
-| 17 | স্ট্রাকচার্ড লগ (`slog`) | `cmd/api/main.go`, `internal/transport/http/` |
-| 18 | এনভায়রনমেন্ট কনফিগ | `internal/config/config.go`, `.env` |
-| 19 | মাইগ্রেশন vs `sqlc` স্কিমা | `migrations/`, `db/schema/` |
-| 20 | ডেভ টুলিং (Make, Air) | `Makefile`, `.air.toml` |
-
-নিচে **বিস্তারিত**।
+| 14 | `sqlc` workflow | `db/`, `sqlc.yaml`, `internal/repository/postgres/` |
+| 15 | Domain validation | `internal/domain/` |
+| 16 | Goroutines, channels, `select`, `WaitGroup` | `internal/platform/async/audit_logger.go` |
+| 17 | Structured logging (`slog`) | `cmd/api/main.go`, `middleware/`, `error_handler.go` |
+| 18 | Environment config | `internal/config/config.go`, `.env` |
+| 19 | Migrations vs sqlc schema | `migrations/`, `db/schema/` |
+| 20 | Dev tooling (Make, Air) | `Makefile`, `.air.toml` |
 
 ---
 
-## 1) Go মডিউল, প্যাকেজ, `internal/`
+## 1) Go modules, packages, `internal/`
 
-**কী শিখবে**
-- `go.mod` এ মডিউল path (`module github.com/storex/go-crud`) — import path এর ভিত্তি।
-- `package main` শুধমাত্র executable এর জন্য।
-- `internal/` — Go convention: বাইরের প্রজেক্ট থেকে `internal/...` import করা যায় না; অ্যাপের কোড এনক্যাপসুলেট থাকে।
+**What to learn**
 
-**এই প্রজেক্টে**
-- `go.mod`, `cmd/api/main.go` (`package main`)
-- বাকি সব `package app`, `package service` ইত্যাদি `internal/` এর নিচে।
+- `go.mod` declares **`module github.com/storex/go-crud`** — base import path.
+- `package main` for executables only.
+- Code under **`internal/`** cannot be imported by other modules — encapsulation.
 
-**প্র্যাকটিস**
-- নতুন প্যাকেজ `internal/foo` বানিয়ে `main` থেকে কল করো; import path ঠিক আছে কিনা দেখো।
+**In this repo**
+
+- `go.mod`, `cmd/api/main.go`
+- Application code under `internal/`.
+
+**Practice**
+
+- Add `internal/demo` and call it from `main` to see how imports resolve.
 
 ---
 
-## 2) `main` ছোট রাখা, `internal/app` এ কম্পোজিশন
+## 2) Small `main`, composition in `internal/app`
 
-**কী শিখবে**
-- `main` শুধু: config → infra (DB) → background workers → `NewServer` → `Run`।
-- “সব কিছু এক জায়গায়” না করে **composition root** (`app.NewServer`) এ wire-up।
+**What to learn**
 
-**এই প্রজেক্টে**
-- `cmd/api/main.go` — সংক্ষিপ্ত বুটস্ট্র্যাপ।
-- `internal/app/app.go` — Fiber, middleware, handler, service তৈরি ও রুট রেজিস্টার।
+- `main`: config → DB pool → audit logger → **`NewServer`** → **`Run`**.
+- **`app.NewServer`** is the composition root (Fiber, middleware, handlers, routes).
 
-**প্র্যাকটিস**
-- নতুন ডিপেন্ডেন্সি (যেমন ক্যাশ ক্লায়েন্ট) যোগ করলে কোথায় `New*` কল করবে — শুধু `app.go` vs `main.go` ঠিক করো।
+**In this repo**
+
+- `cmd/api/main.go` — short bootstrap.
+- `internal/app/app.go` — Fiber app creation and wiring.
+
+**Practice**
+
+- Decide where a new dependency (for example a cache client) should be constructed — `main` vs `app.go`.
 
 ---
 
 ## 3) `defer`
 
-**কী শিখবে**
-- `defer` ফাংশন শেষ হওয়ার আগে চলে (LIFO)। রিসোর্স ক্লিনআপ: `Close()`, `stop()`, ইত্যাদি।
+**What to learn**
 
-**এই প্রজেক্টে**
-- `cmd/api/main.go`: `defer stop()`, `defer pool.Close()`, `defer auditLogger.Stop()`  
-  অর্থাৎ `main` শেষ/প্যানিক হলেও ক্লিনআপের চেষ্টা।
+- `defer` runs when the surrounding function returns (LIFO). Use for cleanup: `Close()`, `Stop()`, cancel funcs.
 
-**প্র্যাকটিস**
-- `defer` order মেনে চিন্তা করো: কোনটা আগে execute হবে।
+**In this repo**
+
+- `cmd/api/main.go`: `defer stop()`, `defer pool.Close()`, `defer auditLogger.Stop()`.
+
+**Practice**
+
+- Reason about defer order when multiple defers run on exit.
 
 ---
 
 ## 4) `context.Context`
 
-**কী শিখবে**
-- ক্যানসেলেশন, টাইমআউট, রিকোয়েস্ট-স্কোপড ডেডলাইন।
-- DB/API কলে `ctx` পাস করা — ক্লায়েন্ট চলে গেলে কাজ বন্ধ করতে পারে।
+**What to learn**
 
-**এই প্রজেক্টে**
-- `signal.NotifyContext(...)` — SIGINT/SIGTERM এ `ctx` cancel।
-- `app.Run` → `ShutdownWithContext(shutdownCtx)`।
-- `handler`: `c.Context()` পাস করে service/repo তে।
-- `internal/platform/db/postgres.go` — ping এ `context.WithTimeout`।
-- `audit_logger.go` — ওয়ার্কার শাটডাউন চ্যানেল `close` + `for range` ড্রেন; প্রসেস সিগনালের `ctx` এখানে সরাসরি লাগে না (`Stop()` `main` এর `defer` থেকে)।
+- Cancellation, deadlines, passing `ctx` into I/O (DB, outbound HTTP).
 
-**প্র্যাকটিস**
-- নতুন DB কলে সবসময় `ctx` পাস করো; `context.Background()` শুধু যেখানে উপযুক্ত।
+**In this repo**
 
----
+- `signal.NotifyContext` in `main`.
+- `app.Run` waits on `ctx.Done()` then **`app.ShutdownWithContext`**.
+- Handlers pass **`c.Context()`** (or `c.UserContext()` if you standardize on that) into services.
 
-## 5) সিগনাল + গ্রেসফুল শাটডাউন
+**Practice**
 
-**কী শিখবে**
-- প্রসেস kill করার আগে লিসেনার বন্ধ, কানেকশন ড্রেন — প্রোডাকশনে গুরুত্বপূর্ণ।
-
-**এই প্রজেক্টে**
-- `main`: `signal.NotifyContext` + `app.Run` এর ভিতরে goroutine যা `ctx.Done()` এর পর `fiber.ShutdownWithContext` চালায়।
-
-**প্র্যাকটিস**
-- Ctrl+C দিয়ে দেখো লগ/বিহেভিয়ার; `SHUTDOWN_TIMEOUT` env বুঝো।
+- Trace one DB call and confirm `ctx` is forwarded to `pgx`.
 
 ---
 
-## 6) স্ট্রাক্ট ও `New*` কনভেনশন
+## 5) Graceful shutdown
 
-**কী শিখবে**
-- `type X struct { ... }`, `func NewX(...) *X` — explicit constructor, zero value এ নির্ভর না করা।
+**What to learn**
 
-**এই প্রজেক্টে**
-- `NewItemRepository`, `NewItemService`, `NewAuthHandler`, `NewServer` ইত্যাদি।
+- On SIGINT/SIGTERM, stop accepting new work and drain in-flight requests where possible.
 
-**প্র্যাকটিস**
-- নতুন সার্ভিস বানালে `NewFooService(deps...)` প্যাটার্ন ফলো করো।
+**In this repo**
 
----
+- Goroutine in `Run` calls **`ShutdownWithContext`** with `cfg.ShutdownTimeout`.
 
-## 7) ইন্টারফেস (ছোট) + ডিপেন্ডেন্সি দিক
+**Practice**
 
-**কী শিখবে**
-- সার্ভিস লেয়ারে `interface` শুধু যা লাগে (Repository মুখ) — টেস্ট/মক সহজ।
-
-**এই প্রজেক্টে**
-- `internal/service/item_service.go` — `type ItemRepository interface { ... }`।
-
-**প্র্যাকটিস**
-- মেমরিতে বলো: সার্ভিস **কনক্রিট** postgres import করে না, শুধ ইন্টারফেস দেখে।
+- Hit Ctrl+C while a slow request runs and observe logs.
 
 ---
 
-## 8) এরর হ্যান্ডলিং (`errors`, `fmt.Errorf`, Fiber error)
+## 6) Fiber basics
 
-**কী শিখবে**
-- `errors.New`, `errors.Is` — sentinel error (`ErrNotFound`)।
-- `fmt.Errorf("...: %w", err)` — wrapping, cause chain।
-- HTTP লেয়ারে `fiber.NewError(status, msg)` — স্ট্যাটাস কোড explicit।
+**What to learn**
 
-**এই প্রজেক্টে**
-- `internal/service/item_service.go` — `pgx.ErrNoRows` → `ErrNotFound`।
-- `internal/transport/http/error_handler.go` — centralized JSON error + `request_id`।
+- **`fiber.New(fiber.Config{...})`** — global **`ErrorHandler`**, timeouts, `AppName`.
+- **`app.Use` / `app.Get` / `app.Post`** — routing and middleware.
+- **`c.BodyParser`**, **`c.JSON`**, **`c.Params`**, **`c.Query`**, **`c.Locals`**.
 
-**প্র্যাকটিস**
-- নতুন ডোমেইন এরর যোগ করে হ্যান্ডলারে `errors.Is` দিয়ে 404/400 ম্যাপ করো।
+**In this repo**
 
----
+- `internal/app/app.go`, `internal/transport/http/router.go`, `handler/`.
 
-## 9) JSON + Fiber HTTP হ্যান্ডলার
+**Practice**
 
-**কী শিখবে**
-- Request body: `c.BodyParser(&struct)`।
-- Response: `c.JSON`, `c.Status(...).JSON`।
-- Path/query params: `c.Params`, `c.Query`।
-
-**এই প্রজেক্টে**
-- `internal/transport/http/handler/auth_handler.go`, `item_handler.go`।
-
-**প্র্যাকটিস**
-- একই প্যাটার্নে নতুন `POST` হ্যান্ডলার লিখো।
+- Add a trivial `GET /version` route and return JSON.
 
 ---
 
-## 10) মিডলওয়্যার চেইন (order matters)
+## 7) Interfaces in the service layer
 
-**কী শিখবে**
-- `app.Use` order = execution order।
-- `c.Next()` — পরের হ্যান্ডলার; return এর পর আবার উপরের মিডলওয়্যারে ফিরে আসে (post-processing)।
+**What to learn**
 
-**এই প্রজেক্টে**
-- `internal/app/app.go`: CORS → RequestIdentity → RequestLogger → routes।
-- `router.go`: `Authenticate` গ্রুপ, তারপর per-route `Authorize`।
+- Services depend on small repository **interfaces** for testability.
 
-**প্র্যাকটিস**
-- লগিং মিডলওয়্যার কেন `c.Next()` এর আশেপাশে — latency কিভাবে মাপে বুঝো।
+**In this repo**
 
----
+- See `internal/service/item_service.go` (and similar) for `ItemRepository`-style interfaces.
 
-## 11) JWT অথেন্টিকেশন
+**Practice**
 
-**কী শিখবে**
-- টোকেন সাইন (`HS256`), claims (role, email), এক্সপায়ারি।
-- প্রতি রিকোয়েস্টে `Authorization: Bearer` পার্স।
-
-**এই প্রজেক্টে**
-- `internal/service/auth_service.go` — `Login`, `ParseToken`, `Claims`।
-- `internal/transport/http/middleware/auth.go` — `Authenticate`।
-
-**প্র্যাকটিস**
-- JWT payload decode (jwt.io বা লগ) করে claims দেখো।
+- Confirm services do not import concrete `postgres` packages directly.
 
 ---
 
-## 12) RBAC (Authorization)
+## 8) Centralized errors (`apierror` + `ErrorHandler`)
 
-**কী শিখবে**
-- অথেন্টিকেশন = কে; অথরাইজেশন = কী করতে পারে।
-- রোল সেট চেক (`admin` vs `user`)।
+**What to learn**
 
-**এই প্রজেক্টে**
-- `middleware.Authorize(service.RoleAdmin, ...)`।
+- Return **`apierror.New(status, code, message)`** from handlers for predictable client errors.
+- Fiber **`ErrorHandler`** maps errors to one JSON shape.
 
-**প্র্যাকটিস**
-- নতুন রোল `moderator` যোগ করে একটা রুট শুধু মডারেটর — রাউটার + middleware ধরন বদলাও।
+**In this repo**
 
----
+- `internal/transport/apierror/`, `internal/transport/http/error_handler.go`.
 
-## 13) PostgreSQL + `pgxpool`
+**Practice**
 
-**কী শিখবে**
-- কানেকশন পুল — concurrency তে থ্রেড/গোরুটিন প্রতি কানেকশন খুলে রাখা ভালো নয়।
-- `Ping`, pool limits, idle/lifetime — অপারেশন স্টেবিলিটি।
-
-**এই প্রজেক্টে**
-- `internal/platform/db/postgres.go` — `pgxpool.ParseConfig`, simple protocol (PgBouncer-friendly), ping retry।
-
-**প্র্যাকটিস**
-- `PG_MAX_CONNS` কমিয়ে লোড টেস্ট মেন্টালি চিন্তা করো।
+- Add a new domain error and map it through `apierror` in a handler.
 
 ---
 
-## 14) `sqlc` ওয়ার্কফ্লো
+## 9) JWT + RBAC
 
-**কী শিখবে**
-- SQL সোর্স `db/query` — স্কিমা `db/schema` — `sqlc generate` — টাইপড Go।
-- হাতে generated ফাইল এডিট না করা।
+**What to learn**
 
-**এই প্রজেক্টে**
-- `sqlc.yaml`, `db/query/items.sql`, `internal/repository/postgres/sqlc/*.go`।
-- `item_repository.go` — adapter: sqlc মডেল → `domain.Item`।
+- HS256 JWTs, **`Authorization: Bearer`**, role claims, refresh token flows as implemented.
 
-**প্র্যাকটিস**
-- নতুন `SELECT` কুয়েরি যোগ → `make sqlc` → রিপোজিটরিতে মেথড wrap।
+**In this repo**
+
+- `internal/service/auth_service.go`, `middleware/auth.go`.
 
 ---
 
-## 15) ডোমেইন মডেল ও ভ্যালিডেশন
+## 10) PostgreSQL + `sqlc`
 
-**কী শিখবে**
-- HTTP স্ট্রাক্ট আলাদা, core entity আলাদা — রিইউজ ও টেস্ট সহজ।
+**What to learn**
 
-**এই প্রজেক্টে**
-- `internal/domain/item.go` — `ValidateForCreate`।
+- Connection pooling, **`make sqlc`**, adapters between sqlc rows and domain types.
 
-**প্র্যাকটিস**
-- `title` max length বদলালে শুধ ডোমেইন vs হ্যান্ডলার — কোথায় রাখা উচিত ঠিক করো।
+**In this repo**
 
----
+- `internal/platform/db/postgres.go`, `db/query`, `internal/repository/postgres/sqlc/`.
 
-## 16) গোরুটিন, চ্যানেল, `select`, `sync.WaitGroup`
+**Practice**
 
-**কী শিখবে**
-- Background worker pool pattern।
-- `close(ch)` + `for range` + `wg.Wait()` — প্রোডিউসার স্টপ ও ড্রেন (audit লগার)।
-- অন্য জায়গায় (যেমন HTTP সার্ভার) `select` + `ctx.Done()` — গ্রেসফুল শাটডাউন।
-- ননব্লকিং সেন্ড (`select` + `default`) — ব্যাকপ্রেশারে ড্রপ (`Publish`)।
-
-**এই প্রজেক্টে**
-- `internal/platform/async/audit_logger.go` — পুরোটাই পড়ার মতো উদাহরণ।
-
-**প্র্যাকটিস**
-- ওয়ার্কার সংখ্যা/বাফার সাইজ বদলে বিহেভিয়ার ভাবো।
+- Change a query, run `make sqlc`, fix compile errors in repositories.
 
 ---
 
-## 17) স্ট্রাকচার্ড লগ (`log/slog`)
+## 11) Audit workers and `slog`
 
-**কী শিখবে**
-- key-value লগ, JSON handler — লগ অ্যাগ্রিগেটরে পাঠানো সহজ।
+**What to learn**
 
-**এই প্রজেক্টে**
-- `cmd/api/main.go` — root logger।
-- `middleware/observability.go` — per-request log।
-- `error_handler.go` — error log।
+- Background workers with channels; non-blocking send under pressure; structured logs.
 
-**প্র্যাকটিস**
-- একটা নতুন ইভেন্টে একই স্টাইলে `logger.Info("event", "key", value)` যোগ করো।
+**In this repo**
+
+- `internal/platform/async/audit_logger.go`, `middleware/observability.go`.
 
 ---
 
-## 18) কনফিগ (`os.Getenv`, validation)
+## 12) Migrations vs sqlc schema
 
-**কী শিখবে**
-- 12-factor style: পোর্ট, DSN, সিক্রেট env থেকে।
-- required env missing হলে fail fast (`log.Fatalf` বা error return)।
+**What to learn**
 
-**এই প্রজেক্টে**
-- `internal/config/config.go`।
+- **Migrations** change the real database.
+- **`db/schema`** is for sqlc only — keep them aligned when you evolve tables.
 
-**প্র্যাকটিস**
-- নতুন `FEATURE_X_ENABLED` env যোগ করে হ্যান্ডলারে ব্রাঞ্চ করো।
+**In this repo**
 
----
-
-## 19) মাইগ্রেশন vs `sqlc` স্কিমা (দুটোর ভূমিকা)
-
-**কী শিখবে**
-- **মাইগ্রেশন** — রিয়েল DB তে টেবিল তৈরি/আপডেট (`migrations/` + `make migrate`)।
-- **`db/schema`** — শুধ sqlc-এর টাইপচেক/জেনারেশন; রানটাইমে অটো অ্যাপ্লাই হয় না।
-
-**এই প্রজেক্টে**
-- `migrations/001_init.sql` এবং `db/schema/items.sql` — একই টেবিলের ধারণা; চেঞ্জ করলে দুটো সিঙ্ক রাখতে হবে (বা পরে এক সোর্সে নিয়ে যাওয়া যায়)।
+- `migrations/001_init.sql`, `db/schema/*.sql`.
 
 ---
 
-## 20) ডেভ এক্সপেরিয়েন্স (Make, Air)
+## 13) Makefile and Air
 
-**কী শিখবে**
-- `Makefile` — এক কমান্ডে বিল্ড/রান/জেনারেট।
-- Air — ফাইল চেঞ্জে রিবিল্ড।
+**What to learn**
 
-**এই প্রজেক্টে**
-- `Makefile`, `.air.toml`।
+- One-command workflows: **`make run`**, **`make migrate`**, **`make sqlc`**, **`make watch`**.
+
+**In this repo**
+
+- `Makefile` (note optional **`include .env`** + **`export`** for subprocesses), `.air.toml`.
 
 ---
 
-## নিজের প্রজেক্ট শুরু করতে “মিনিমাম চেকলিস্ট”
+## Minimum checklist for your own API
 
-তুমি নিচেরগুলো ছাড়া ছাড়া না করলে বেশিরভাগ API সার্ভিস দাঁড়াবে:
-
-1. `main` + `internal/app` (বা এক জায়গায়) wire-up  
+1. `main` + composition root (`internal/app` or equivalent)  
 2. `context` + graceful shutdown  
-3. `defer` দিয়ে DB close  
-4. রাউটার + একটা হ্যান্ডলার  
-5. সার্ভিস + রিপোজিটরি ইন্টারফেস  
-6. DB pool + মাইগ্রেশন  
-7. (optional কিন্তু শক্তিশালী) `sqlc`  
-8. সেন্ট্রাল এরর + স্ট্রাকচার্ড লগ  
-9. হেলথ চেক (`/healthz`, `/readyz`)  
-10. অথ + অথর (JWT + role) যদি ইউজার থাকে  
+3. `defer` for pool / background workers  
+4. Router + at least one handler  
+5. Service + repository interfaces  
+6. DB pool + migrations  
+7. (Recommended) `sqlc`  
+8. Central error JSON + structured logs  
+9. `/healthz` and `/readyz`  
+10. JWT + roles if you have multiple actors  
 
 ---
 
-## আরও গভীরে যেতে চাইলে (এই রিপোর বাইরে)
+## Going deeper (outside this repo)
 
-এগুলো এই প্রজেক্টে এখনো পূর্ণ নয়, কিন্তু নিজের প্রজেক্টে লাগবে:
-
-- টেস্ট: `testing`, table-driven tests, httptest, integration + testcontainers  
-- মেট্রিক্স/ট্রেসিং: Prometheus, OpenTelemetry  
-- রেট লিমিট, আইডempotency, আউটবক্স প্যাটার্ন  
+- Integration tests with **`httptest`** or **testcontainers**  
+- Metrics / tracing (Prometheus, OpenTelemetry)  
+- Rate limiting, idempotency keys  
 
 ---
 
-## সম্পর্কিত ডক
+## Related docs
 
-- পুরো প্রজেক্ট গাইড: [`DOCS.md`](./DOCS.md)  
-- রিকোয়েস্ট লাইফসাইকেল: [`REQUEST_LIFECYCLE.md`](./REQUEST_LIFECYCLE.md)  
+- [DOCS.md](./DOCS.md)  
+- [REQUEST_LIFECYCLE.md](./REQUEST_LIFECYCLE.md)  
+- [ARCHITECTURE.md](./ARCHITECTURE.md)  

@@ -53,7 +53,7 @@ func NewServer(cfg config.Config, logger *slog.Logger, pool *pgxpool.Pool, audit
 	})
 
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: "http://127.0.0.1:8080",
+		AllowOrigins: "http://127.0.0.1:8080,http://localhost:8080",
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization, X-Request-ID",
 		AllowMethods: "GET,POST,PUT,PATCH,DELETE,OPTIONS",
 	}))
@@ -80,8 +80,8 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger, app *fiber
 		"api started",
 		"addr", cfg.HTTPAddr,
 		"env", cfg.AppEnv,
-		"swagger_ui", "http://127.0.0.1"+cfg.HTTPAddr+"/swagger",
-		"openapi", "http://127.0.0.1"+cfg.HTTPAddr+"/openapi.yaml",
+		"swagger_ui", "http://127.0.0.1"+cfg.HTTPAddr+httptransport.SwaggerUIPath,
+		"openapi", "http://127.0.0.1"+cfg.HTTPAddr+httptransport.OpenAPISpecPath,
 	)
 	if err := app.Listen(cfg.HTTPAddr); err != nil {
 		return fmt.Errorf("listen: %w", err)
